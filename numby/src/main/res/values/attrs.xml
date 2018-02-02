@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <declare-styleable name="Numby">
+        <attr name="backgroundColor" format="color"/>
+        <attr name="textColor" format="color"/>
+        <attr name="addDrawableColor" format="color"/>
+        <attr name="subDrawableColor" format="color"/>
+        <attr name="initialNumber" format="integer"/>
+        <attr name="finalNumber" format="integer" />
+        <attr name="textSize" format="dimension"/>
+        <attr name="isCircularEdge" format="boolean"/>
+        <attr name="cornerRadius" format="dimension"/>
+        <attr name="collapsible" format="boolean" />
+        <attr name="layoutElevation" format="dimension"/>
+        <attr name="addDrawable" format="reference"/>
+        <attr name="subDrawable" format="reference"/>
+        <attr name="backgroundAlpha" format="float"/>
+        <attr name="useThrottling" format="boolean"/>
+        <attr name="fontTypeFace" format="reference"/>
+    </declare-styleable>
+
+
+</resources>
