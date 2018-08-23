@@ -8,6 +8,7 @@ import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Handler;
+import android.os.SystemClock;
 import android.support.annotation.ColorInt;
 import android.support.v4.content.res.ResourcesCompat;
 import android.support.v4.graphics.drawable.DrawableCompat;
@@ -166,13 +167,19 @@ public class Numby extends FrameLayout {
 //            container.setPreventCornerOverlap(false);
 //            container.setUseCompatPadding(true);
 //        }
+
+
         setElevation(elevation);
         initViewRadius(cornerRadii);
+        setNumber(String.valueOf(initialNumber) , false);
 
-        if (!isCollapsible) {
-            textView.setVisibility(VISIBLE);
-            subButton.setVisibility(VISIBLE);
-        }
+//        if (isCollapsible && initialNumber==0) {
+//            textView.setVisibility(GONE);
+//            subButton.setVisibility(GONE);
+//        } else {
+//            textView.setVisibility(VISIBLE);
+//            subButton.setVisibility(VISIBLE);
+//        }
 
         if (useThrottling) {
             handler = new Handler();
@@ -266,16 +273,12 @@ public class Numby extends FrameLayout {
 
 
             // throttle user interaction and decrease the calls back
-            if ( (System.currentTimeMillis() - lastEventTime) <= THRESHOLD) {
-                lastEventTime = System.currentTimeMillis();
-
-                // reset timer
+            if (SystemClock.uptimeMillis() - lastEventTime <= THRESHOLD) {
                 handler.removeCallbacks(runnable);
-                handler.postDelayed(runnable, THRESHOLD);
-            } else {
-                // start a timer
-                handler.postDelayed(runnable, THRESHOLD);
             }
+            lastEventTime = SystemClock.uptimeMillis();
+            handler.postDelayed(runnable, THRESHOLD);
+
         }
     }
 
@@ -315,7 +318,6 @@ public class Numby extends FrameLayout {
                 textView.setVisibility(VISIBLE);
             }
         }
-
     }
 
     public void setOnClickListener(OnClickListener onClickListener) {
