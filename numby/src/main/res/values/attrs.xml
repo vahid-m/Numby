@@ -17,7 +17,6 @@
         <attr name="subDrawable" format="reference"/>
         <attr name="backgroundAlpha" format="float"/>
         <attr name="useThrottling" format="boolean"/>
-        <attr name="fontTypeFace" format="reference"/>
     </declare-styleable>
 
 

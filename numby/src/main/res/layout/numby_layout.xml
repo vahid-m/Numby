@@ -33,15 +33,26 @@
                 android:textStyle="bold"
                 android:visibility="gone" />
 
-            <android.support.v7.widget.AppCompatTextView
+
+            <TextSwitcher
                 android:id="@+id/number_counter"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:layout_gravity="center"
                 android:background="@android:color/transparent"
                 android:gravity="center"
-                android:padding="10dp"
-                android:visibility="gone"/>
+                android:visibility="gone"
+                />
+
+            <!--<android.support.v7.widget.AppCompatTextView-->
+                <!--android:id="@+id/number_counter"-->
+                <!--android:layout_width="wrap_content"-->
+                <!--android:layout_height="match_parent"-->
+                <!--android:layout_gravity="center"-->
+                <!--android:background="@android:color/transparent"-->
+                <!--android:gravity="center"-->
+                <!--android:padding="10dp"-->
+                <!--android:visibility="gone"/>-->
 
             <TextView
                 android:id="@+id/add_btn"

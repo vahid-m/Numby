@@ -4,20 +4,24 @@ import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.PorterDuff;
-import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Handler;
 import android.os.SystemClock;
 import android.support.annotation.ColorInt;
-import android.support.v4.content.res.ResourcesCompat;
 import android.support.v4.graphics.drawable.DrawableCompat;
 import android.support.v7.widget.CardView;
 import android.util.AttributeSet;
 import android.util.TypedValue;
+import android.view.ContextThemeWrapper;
+import android.view.Gravity;
 import android.view.View;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
 import android.widget.FrameLayout;
+import android.widget.TextSwitcher;
 import android.widget.TextView;
+import android.widget.ViewSwitcher;
 
 import com.vnm.numby.R;
 
@@ -31,14 +35,22 @@ import com.vnm.numby.R;
 public class Numby extends FrameLayout {
     private static final long THRESHOLD = 1000L;
 
-    private Context context;
-    private AttributeSet attrs;
-    private int styleAttr;
-    private OnClickListener mListener;
-    private int initialNumber;
-    private int lastNumber;
-    private int currentNumber;
-    private int finalNumber;
+    // views
+    private CardView container;
+    private TextSwitcher textView;
+    private TextView subButton;
+    private TextView addButton;
+
+
+    private int value;
+    private int lastValue;
+    private int minValue;
+    private int maxValue;
+
+    // interfaces
+    private OnClickListener onClickListener;
+    private OnValueChangeListener onValueChangeListener;
+
 
     // throttling features
     private boolean useThrottling;
@@ -47,13 +59,8 @@ public class Numby extends FrameLayout {
     private Runnable runnable;
 
 
-    private TextView textView;
-    private TextView subButton;
-    private TextView addButton;
+    // view attributes
     private int backgroundColor;
-    private CardView container;
-
-    private OnValueChangeListener mOnValueChangeListener;
     private float textSize;
     private int textColor;
     private int addBtnColor;
@@ -65,58 +72,45 @@ public class Numby extends FrameLayout {
     private int elevation;
     private Drawable addBtnDrawable;
     private Drawable subBtnDrawable;
-    private int typeface;
 
+    private Animation inFromTop;
+    private Animation outFromBottom;
+    private Animation inFromBottom;
+    private Animation outFromTop;
 
     public Numby(Context context) {
         super(context);
-        this.context = context;
-        inflateLayout();
-        initAttributes();
+        initAttributes(context, null, 0);
         initView();
     }
 
     public Numby(Context context, AttributeSet attrs) {
         super(context, attrs);
-        this.context = context;
-        this.attrs = attrs;
-        inflateLayout();
-        initAttributes();
+        initAttributes(context, attrs, 0);
         initView();
     }
 
     public Numby(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
-        this.context = context;
-        this.attrs = attrs;
-        this.styleAttr = defStyleAttr;
-        inflateLayout();
-        initAttributes();
+        initAttributes(context, attrs, defStyleAttr);
         initView();
     }
 
-    private void inflateLayout() {
-        inflate(context, R.layout.numby_layout, this);
-        subButton = findViewById(R.id.subtract_btn);
-        addButton = findViewById(R.id.add_btn);
-        textView = findViewById(R.id.number_counter);
-        container = findViewById(R.id.layout);
-    }
 
-    private void initAttributes() {
+    private void initAttributes(Context context, AttributeSet attrs, int defStyleAttr) {
         final Resources res = getResources();
         final int defaultColor = res.getColor(R.color.colorPrimary);
         final int defaultTextColor = res.getColor(R.color.colorText);
 
-        TypedArray styleable = context.obtainStyledAttributes(attrs, R.styleable.Numby, styleAttr, 0);
+        TypedArray styleable = getContext().obtainStyledAttributes(attrs, R.styleable.Numby, defStyleAttr, 0);
 
 
         backgroundColor = styleable.getColor(R.styleable.Numby_backgroundColor, defaultColor);
         textColor = styleable.getColor(R.styleable.Numby_textColor, defaultTextColor);
         addBtnColor = styleable.getColor(R.styleable.Numby_addDrawableColor, defaultTextColor);
         subBtnColor = styleable.getColor(R.styleable.Numby_subDrawableColor, defaultTextColor);
-        initialNumber = styleable.getInt(R.styleable.Numby_initialNumber, 0);
-        finalNumber = styleable.getInt(R.styleable.Numby_finalNumber, Integer.MAX_VALUE);
+        minValue = styleable.getInt(R.styleable.Numby_initialNumber, 0);
+        maxValue = styleable.getInt(R.styleable.Numby_finalNumber, Integer.MAX_VALUE);
         textSize = styleable.getDimensionPixelSize(R.styleable.Numby_textSize, 13);
         isCircular = styleable.getBoolean(R.styleable.Numby_isCircularEdge, false);
         cornerRadii = styleable.getDimensionPixelSize(R.styleable.Numby_cornerRadius, dp2Px(context, 3));
@@ -126,40 +120,53 @@ public class Numby extends FrameLayout {
         subBtnDrawable = styleable.getDrawable(R.styleable.Numby_subDrawable);
         alpha = styleable.getFloat(R.styleable.Numby_backgroundAlpha, 1);
         useThrottling = styleable.getBoolean(R.styleable.Numby_useThrottling, true);
-        typeface = styleable.getResourceId(R.styleable.Numby_fontTypeFace,-1);
 
         styleable.recycle();
 
-        currentNumber = initialNumber;
-        lastNumber = initialNumber;
+        value = minValue;
+        lastValue = value;
     }
 
 
     private void initView() {
+        inflate(getContext(), R.layout.numby_layout, this);
+
+        // setup container
+        container = findViewById(R.id.layout);
         container.setClipToPadding(false);
         setBackgroundColor(backgroundColor);
         setAlpha(alpha);
-        setTypeFace();
-        setTextColor(textColor);
-        setTextSize(textSize);
+        setElevation(elevation);
+        initViewRadius(cornerRadii);
+
+
+        // setup buttons
         initButtons();
 
-        textView.setText(String.valueOf(initialNumber));
+        // setup text
+        textView  = findViewById(R.id.number_counter);
+        textView.setFactory(new ViewSwitcher.ViewFactory() {
+            @Override
+            public View makeView() {
+                TextView myText = new TextView(new ContextThemeWrapper(getContext(), R.style.AppTheme), null, 0);
+                myText.setGravity(Gravity.CENTER);
+                myText.setTextColor(textColor);
+                myText.setTextSize(TypedValue.COMPLEX_UNIT_PX, textSize);
+                myText.setEms(String.valueOf(maxValue).length()-1);
 
-        subButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View mView) {
-                int num = Integer.valueOf(textView.getText().toString());
-                setNumber(String.valueOf(num - 1), true);
+                FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+                params.gravity = Gravity.CENTER;
+                myText.setLayoutParams(params);
+
+                return myText;
             }
         });
-        addButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View mView) {
-                int num = Integer.valueOf(textView.getText().toString());
-                setNumber(String.valueOf(num + 1), true);
-            }
-        });
+
+        // Declare the in and out animations and initialize them
+        inFromTop = AnimationUtils.loadAnimation(getContext(), R.anim.slide_in_top);
+        outFromBottom = AnimationUtils.loadAnimation(getContext(), R.anim.slide_out_bottom);
+        inFromBottom = AnimationUtils.loadAnimation(getContext(), R.anim.slide_in_bottom);
+        outFromTop = AnimationUtils.loadAnimation(getContext(), R.anim.slide_out_top);
 
 
 //        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
@@ -168,39 +175,23 @@ public class Numby extends FrameLayout {
 //            container.setUseCompatPadding(true);
 //        }
 
-
-        setElevation(elevation);
-        initViewRadius(cornerRadii);
-        setNumber(String.valueOf(initialNumber) , false);
-
-//        if (isCollapsible && initialNumber==0) {
-//            textView.setVisibility(GONE);
-//            subButton.setVisibility(GONE);
-//        } else {
-//            textView.setVisibility(VISIBLE);
-//            subButton.setVisibility(VISIBLE);
-//        }
-
         if (useThrottling) {
             handler = new Handler();
             runnable = new Runnable() {
                 @Override
                 public void run() {
-                    mOnValueChangeListener.onValueChange(Numby.this, lastNumber, currentNumber);
+                    onValueChangeListener.onValueChange(Numby.this, lastValue, value);
+                    lastValue = value;
                 }
             };
         }
-
-    }
-
-    private void setTypeFace() {
-        if (typeface == -1) return;
-        textView.setTypeface(ResourcesCompat.getFont(getContext(),typeface));
-        if (addBtnDrawable == null) addButton.setTypeface(ResourcesCompat.getFont(getContext(),typeface));
-        if (subBtnDrawable == null) subButton.setTypeface(ResourcesCompat.getFont(getContext(),typeface));
+        setNumber(value , false);
     }
 
     private void initButtons() {
+        subButton = findViewById(R.id.subtract_btn);
+        addButton = findViewById(R.id.add_btn);
+
         addButton.setTextColor(addBtnColor);
         subButton.setTextColor(subBtnColor);
         subButton.setTextSize(TypedValue.COMPLEX_UNIT_PX, textSize);
@@ -218,6 +209,23 @@ public class Numby extends FrameLayout {
             Drawable drawable = tintDrawable(subBtnDrawable, subBtnColor);
             subButton.setCompoundDrawablesWithIntrinsicBounds(drawable, null, null, null);
         }
+
+
+        subButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View mView) {
+                int num = value - 1;
+                setNumber(num, true);
+            }
+        });
+
+        addButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View mView) {
+                int num = value + 1;
+                setNumber(num, true);
+            }
+        });
     }
 
     @Override
@@ -225,7 +233,7 @@ public class Numby extends FrameLayout {
 
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
             elevation = 0;
-            int padding = dp2Px(context, 4);
+            int padding = dp2Px(getContext(), 4);
 
             container.setMaxCardElevation(elevation);
             container.setContentPadding(
@@ -260,17 +268,44 @@ public class Numby extends FrameLayout {
     }
 
 
-    private void callListener(View view) {
-        if (mListener != null) {
-            mListener.onClick(view);
+    private void callListener() {
+        if (onClickListener != null)
+            onClickListener.onClick(Numby.this);
+        if (onValueChangeListener !=null) {
+            onValueChangeListener.onValueChange(Numby.this,lastValue, value);
+            lastValue = value;
         }
 
-        if (mOnValueChangeListener != null && lastNumber != currentNumber) {
-            if (!useThrottling) {
-                mOnValueChangeListener.onValueChange(Numby.this,lastNumber,currentNumber);
-                return;
-            }
+    }
 
+    public String getNumber() {
+        return String.valueOf(value);
+    }
+
+    public void setNumber(int number, boolean notifyListener) {
+        // set the animation type of textSwitcher
+        textView.setInAnimation((number > value) ? inFromTop : inFromBottom);
+        textView.setOutAnimation((number > value) ? outFromBottom : outFromTop);
+
+        // update the view first
+        number = (number > maxValue) ? maxValue : number;
+        number = (number < minValue) ? minValue : number;
+
+        if (value == number) return; // it reaches to minimum or maximum value
+
+        // update the text view and current value
+        textView.setText(String.valueOf(number));
+        value = number;
+        if (isCollapsible) handleVisibility();
+
+
+        // handle listeners
+        if (!notifyListener) return;
+
+        if (!useThrottling) {
+            callListener();
+        } else {
+            if (lastValue == number) return;
 
             // throttle user interaction and decrease the calls back
             if (SystemClock.uptimeMillis() - lastEventTime <= THRESHOLD) {
@@ -278,38 +313,11 @@ public class Numby extends FrameLayout {
             }
             lastEventTime = SystemClock.uptimeMillis();
             handler.postDelayed(runnable, THRESHOLD);
-
-        }
-    }
-
-    public String getNumber() {
-        return String.valueOf(currentNumber);
-    }
-
-
-    private void setNumber(String number) {
-        lastNumber = currentNumber;
-        this.currentNumber = Integer.parseInt(number);
-        if (this.currentNumber > finalNumber) {
-            this.currentNumber = finalNumber;
-        }
-        if (this.currentNumber < initialNumber) {
-            this.currentNumber = initialNumber;
-        }
-        textView.setText(String.valueOf(currentNumber));
-    }
-
-
-    public void setNumber(String number, boolean notifyListener) {
-        setNumber(number);
-        if (isCollapsible) handleVisibility();
-        if (notifyListener) {
-            callListener(this);
         }
     }
 
     private void handleVisibility() {
-        if (currentNumber == initialNumber) {
+        if (value == minValue) {
             subButton.setVisibility(GONE);
             textView.setVisibility(GONE);
         } else {
@@ -321,23 +329,15 @@ public class Numby extends FrameLayout {
     }
 
     public void setOnClickListener(OnClickListener onClickListener) {
-        this.mListener = onClickListener;
+        this.onClickListener = onClickListener;
     }
 
     public void setOnValueChangeListener(OnValueChangeListener onValueChangeListener) {
-        mOnValueChangeListener = onValueChangeListener;
-    }
-
-    public void setTextColor(int textColor) {
-        textView.setTextColor(textColor);
-    }
-
-    public void setTextSize(float textSize) {
-        textView.setTextSize(TypedValue.COMPLEX_UNIT_PX, textSize);
+        this.onValueChangeListener = onValueChangeListener;
     }
 
     public interface OnClickListener {
-        void onClick(View view);
+        void onClick(Numby view);
     }
 
     public interface OnValueChangeListener {
@@ -345,8 +345,8 @@ public class Numby extends FrameLayout {
     }
 
     public void setRange(Integer startingNumber, Integer endingNumber) {
-        this.initialNumber = startingNumber;
-        this.finalNumber = endingNumber;
+        this.minValue = startingNumber;
+        this.maxValue = endingNumber;
     }
 
     @Override

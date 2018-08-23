@@ -19,11 +19,11 @@ public class MainActivity extends AppCompatActivity {
         numby.setOnValueChangeListener(new Numby.OnValueChangeListener() {
             @Override
             public void onValueChange(Numby view, int oldValue, int newValue) {
-                Snackbar snackbar = Snackbar
-                        .make(findViewById(R.id.root), "current value: " + newValue, Snackbar.LENGTH_SHORT);
-                snackbar.show();
-
-                Log.d("numby: ", "onValueChange: " + newValue);
+                Snackbar.make(
+                        findViewById(R.id.root),
+                        "last value: " + oldValue + "\ncurrent value: " + newValue,
+                        Snackbar.LENGTH_SHORT
+                ).show();
             }
         });
     }
